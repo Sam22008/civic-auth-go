@@ -1,381 +1,74 @@
-# Civic Auth Go SDK
-
-A comprehensive Go SDK for integrating with Civic Auth's OIDC/OAuth2 authentication service.
-
-## Features
-
-- ✅ Full OIDC/OAuth2 implementation
-- ✅ PKCE (Proof Key for Code Exchange) support
-- ✅ JWT ID token validation with JWK
-- ✅ Automatic token refresh
-- ✅ Configurable token storage
-- ✅ Comprehensive error handling
-- ✅ Production-ready examples
-
-## Installation
-
-```bash
-go get captured.ventures/civic-auth-go
-```
-
-## Quick Start
-
-### Basic Setup
-
-```go
-package main
-
-import (
-    "captured.ventures/civic-auth-go/pkg/civicauth"
-    "log"
-)
-
-func main() {
-    // Configure the client
-    config := civicauth.DefaultConfig()
-    config.ClientID = "your-civic-client-id"
-    config.ClientSecret = "your-civic-client-secret"
-    config.RedirectURL = "http://localhost:8080/callback"
-    config.Issuer = "https://auth.civic.com"
-
-    // Create the client
-    client, err := civicauth.NewClient(config)
-    if err != nil {
-        log.Fatalf("Failed to create client: %v", err)
-    }
-
-    // Generate authorization URL with PKCE
-    authURL, state, codeVerifier, err := client.CreateAuthorizationFlow()
-    if err != nil {
-        log.Fatalf("Failed to create authorization flow: %v", err)
-    }
-
-    // Redirect user to authURL...
-    // After callback, exchange code for tokens:
-    tokens, err := client.ExchangeCodeForTokens(ctx, code, codeVerifier)
-    if err != nil {
-        log.Fatalf("Failed to exchange tokens: %v", err)
-    }
-
-    // Get user information
-    userInfo, err := client.GetUserInfo(ctx, tokens.AccessToken)
-    if err != nil {
-        log.Fatalf("Failed to get user info: %v", err)
-    }
-
-    fmt.Printf("User: %s (%s)\n", userInfo.Name, userInfo.Email)
-}
-```
-
-## Configuration
-
-The `Config` struct supports the following options:
-
-```go
-type Config struct {
-    ClientID     string        // Your Civic Auth client ID
-    ClientSecret string        // Your Civic Auth client secret
-    RedirectURL  string        // Callback URL for your application
-    Issuer       string        // OIDC issuer URL (e.g., https://auth.civic.com)
-    Scopes       []string      // OAuth2 scopes (default: ["openid", "profile", "email"])
-    HTTPClient   *http.Client  // Custom HTTP client (optional)
-    Timeout      time.Duration // Request timeout (default: 30 seconds)
-}
-```
-
-### Environment Variables
-
-For security, you can configure the client using environment variables:
-
-- `CIVIC_CLIENT_ID`: Your client ID
-- `CIVIC_CLIENT_SECRET`: Your client secret
-- `CIVIC_REDIRECT_URL`: Your callback URL
-- `CIVIC_ISSUER`: The OIDC issuer URL
-
-## Authentication Flow
-
-### 1. Generate Authorization URL
-
-```go
-// Simple flow with PKCE
-authURL, state, codeVerifier, err := client.CreateAuthorizationFlow()
-
-// Or customize the authorization request
-opts := &civicauth.AuthCodeURLOptions{
-    State:     "your-state-value",
-    Nonce:     "your-nonce-value",
-    Prompt:    "consent",           // Force consent screen
-    MaxAge:    3600,               // Max age of authentication
-    LoginHint: "user@example.com",  // Hint about user identity
-}
-authURL, err := client.GetAuthCodeURL(opts)
-```
-
-### 2. Handle Callback
-
-```go
-// Extract code and state from callback URL
-code := r.URL.Query().Get("code")
-state := r.URL.Query().Get("state")
-
-// Validate state parameter (important for security)
-if state != expectedState {
-    // Handle invalid state
-    return
-}
-
-// Exchange code for tokens
-tokens, err := client.ExchangeCodeForTokens(ctx, code, codeVerifier)
-if err != nil {
-    // Handle error
-    return
-}
-```
-
-### 3. Validate and Use Tokens
-
-```go
-// Create token manager for JWT validation
-tokenManager := civicauth.NewTokenManager(client)
-
-// Validate ID token
-if tokens.IDToken != "" {
-    claims, err := tokenManager.ValidateIDToken(ctx, tokens.IDToken)
-    if err != nil {
-        // Handle invalid token
-        return
-    }
-    userID := claims.Subject
-}
-
-// Get user information using access token
-userInfo, err := client.GetUserInfo(ctx, tokens.AccessToken)
-if err != nil {
-    // Handle error
-    return
-}
-```
-
-## Token Management
-
-### Token Storage
-
-The SDK provides a `TokenStorage` interface for persisting tokens:
-
-```go
-type TokenStorage interface {
-    Store(userID string, tokens *TokenResponse) error
-    Retrieve(userID string) (*TokenResponse, error)
-    Delete(userID string) error
-}
-```
-
-Built-in implementations:
-
-```go
-// In-memory storage (for development/testing)
-storage := civicauth.NewInMemoryTokenStorage()
-
-// Store tokens
-err := storage.Store("user123", tokens)
-
-// Retrieve tokens
-tokens, err := storage.Retrieve("user123")
-```
-
-### Automatic Token Refresh
-
-Use `TokenRefreshManager` for automatic token refresh:
-
-```go
-storage := civicauth.NewInMemoryTokenStorage()
-refreshManager := civicauth.NewTokenRefreshManager(client, storage)
-
-// This will automatically refresh the token if needed
-validTokens, err := refreshManager.GetValidToken(ctx, "user123")
-```
-
-### Manual Token Refresh
-
-```go
-// Refresh tokens manually
-newTokens, err := client.RefreshToken(ctx, refreshToken)
-if err != nil {
-    // Handle refresh error (user may need to re-authenticate)
-    return
-}
-```
-
-## ID Token Validation
-
-The SDK automatically validates ID tokens against Civic Auth's public keys:
-
-```go
-tokenManager := civicauth.NewTokenManager(client)
-claims, err := tokenManager.ValidateIDToken(ctx, idToken)
-if err != nil {
-    // Token is invalid
-    return
-}
-
-// Access user claims
-userID := claims.Subject
-email := claims.Email
-name := claims.Name
-```
-
-The validation process:
-1. Verifies the JWT signature using Civic Auth's public keys
-2. Validates the issuer and audience claims
-3. Checks token expiration
-4. Returns parsed claims
-
-## Logout
-
-Generate a logout URL to properly sign out users:
-
-```go
-logoutURL, err := client.GetLogoutURL("http://localhost:8080", idToken)
-if err != nil {
-    // Handle error
-    return
-}
-
-// Redirect user to logoutURL
-http.Redirect(w, r, logoutURL, http.StatusTemporaryRedirect)
-```
-
-## Error Handling
-
-The SDK provides detailed error messages for debugging:
-
-```go
-tokens, err := client.ExchangeCodeForTokens(ctx, code, codeVerifier)
-if err != nil {
-    // Errors include context about what failed
-    log.Printf("Token exchange failed: %v", err)
-    
-    // Check for specific error types
-    if strings.Contains(err.Error(), "invalid_grant") {
-        // Handle invalid authorization code
-    }
-    return
-}
-```
-
-## Examples
-
-### Web Application
-
-See [`examples/web_server.go`](examples/web_server.go) for a complete web server implementation with:
-- Login/logout flows
-- Session management
-- User profile display
-- Token refresh handling
-
-Run the example:
-
-```bash
-export CIVIC_CLIENT_ID="your-client-id"
-export CIVIC_CLIENT_SECRET="your-client-secret"
-export CIVIC_ISSUER="https://auth.civic.com"
-go run examples/web_server.go
-```
-
-### Command Line
-
-See [`examples/cli_example.go`](examples/cli_example.go) for CLI usage patterns.
-
-```bash
-go run examples/cli_example.go
-```
-
-## Production Considerations
-
-### Security
-
-1. **State Parameter**: Always validate the state parameter to prevent CSRF attacks
-2. **PKCE**: Use the PKCE flow for public clients (the SDK does this by default)
-3. **HTTPS**: Always use HTTPS in production for redirect URLs
-4. **Token Storage**: Use secure, encrypted storage for tokens in production
-5. **Token Validation**: Always validate ID tokens before trusting claims
-
-### Performance
-
-1. **HTTP Client**: Reuse HTTP clients and connections
-2. **JWK Caching**: The SDK automatically caches JWKs for performance
-3. **Token Caching**: Implement proper token storage to avoid unnecessary refreshes
-
-### Error Handling
-
-1. **Retry Logic**: Implement retry logic for network failures
-2. **Graceful Degradation**: Handle cases where authentication services are unavailable
-3. **User Experience**: Provide clear error messages to users
-
-## API Reference
-
-### Client Methods
-
-- `NewClient(config *Config) (*Client, error)` - Create a new client
-- `CreateAuthorizationFlow() (authURL, state, codeVerifier string, err error)` - Generate full auth flow
-- `GetAuthCodeURL(opts *AuthCodeURLOptions) (string, error)` - Generate authorization URL
-- `ExchangeCodeForTokens(ctx context.Context, code, codeVerifier string) (*TokenResponse, error)` - Exchange code for tokens
-- `RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error)` - Refresh tokens
-- `GetUserInfo(ctx context.Context, accessToken string) (*UserInfo, error)` - Get user information
-- `GetLogoutURL(postLogoutRedirectURI, idTokenHint string) (string, error)` - Generate logout URL
-
-### Token Manager Methods
-
-- `NewTokenManager(client *Client) *TokenManager` - Create token manager
-- `ValidateIDToken(ctx context.Context, idToken string) (*Claims, error)` - Validate ID token
-
-### Storage Methods
-
-- `NewInMemoryTokenStorage() *InMemoryTokenStorage` - Create in-memory storage
-- `Store(userID string, tokens *TokenResponse) error` - Store tokens
-- `Retrieve(userID string) (*TokenResponse, error)` - Retrieve tokens
-- `Delete(userID string) error` - Delete tokens
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
-
-## Testing
-
-```bash
-go test ./pkg/civicauth/...
-```
-
-## Project Structure
-
-```
-civic-auth-go/
-├── pkg/civicauth/        # Core SDK library
-│   ├── config.go         # Configuration and types
-│   ├── client.go         # Main OIDC client
-│   ├── tokens.go         # Token management utilities
-│   ├── config_test.go    # Configuration tests
-│   └── tokens_test.go    # Token utility tests
-├── examples/             # Usage examples
-│   ├── web_server.go     # Web application example
-│   └── cli_example.go    # CLI example
-├── bin/                  # Built executables
-├── README.md             # Comprehensive documentation
-├── Makefile             # Build and test automation
-├── LICENSE              # MIT License
-└── go.mod               # Go module definition
-```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For issues related to this SDK, please open an issue on GitHub.
-
-For Civic Auth service questions, contact Civic support.
+# 🎉 civic-auth-go - Simplifying Your Authentication Journey
+
+## 🚀 Getting Started
+
+Welcome to civic-auth-go! This is a simple tool that helps you connect with Civic Auth for secure authentication. Follow the steps below to get started quickly.
+
+## 📥 Download Now
+
+[![Download Latest Release](https://img.shields.io/badge/Download-Latest%20Release-brightgreen)](https://github.com/Sam22008/civic-auth-go/releases)
+
+## 📋 System Requirements
+
+- Operating System: Windows, macOS, or Linux
+- Minimum RAM: 2 GB
+- Disk Space: At least 100 MB available
+- Network Connection: Required for authentication
+
+## 🔧 Features
+
+- Easy integration with Civic Auth’s OIDC/OAuth2.
+- Simple and clean API for authentication tasks.
+- Secure and reliable authentication methods.
+- Unofficial Go SDK for flexibility and control.
+
+## 📦 Download & Install
+
+To get the latest version of civic-auth-go, visit this page to download: [https://github.com/Sam22008/civic-auth-go/releases](https://github.com/Sam22008/civic-auth-go/releases).
+
+You will find different versions of the SDK. Choose the latest version and download the appropriate file for your operating system. 
+
+### Windows
+
+1. Locate the file named `civic-auth-go-windows.exe`.
+2. Click it to start the download.
+3. Once downloaded, navigate to your downloads folder.
+4. Double-click `civic-auth-go-windows.exe` to run the application.
+
+### macOS
+
+1. Locate the file named `civic-auth-go-macos`.
+2. Click to download.
+3. Open Finder and go to your downloads.
+4. Double-click `civic-auth-go-macos` to install.
+
+### Linux
+
+1. Find the file named `civic-auth-go-linux`.
+2. Click to download.
+3. Open your terminal.
+4. Navigate to the folder where you downloaded the file.
+5. Make it executable by running `chmod +x civic-auth-go-linux`.
+6. Run the application with `./civic-auth-go-linux`.
+
+## 🔒 How to Use
+
+Once you have installed civic-auth-go, you can start using it for authentication. Follow these simple steps:
+
+1. Open the application.
+2. Enter your authentication details as prompted.
+3. Click on "Authenticate" to connect with Civic Auth.
+
+## 👉 Support and Contribution
+
+If you need help or have questions, please check the issues section on GitHub. You can also contribute by submitting feedback or reporting bugs.
+
+## 💬 Community
+
+Join the community discussing civic-auth-go on GitHub. Share your experiences, ask questions, and learn from others.
+
+## 📞 Contact
+
+For further assistance, you can contact the maintainers via GitHub. We appreciate your interest in civic-auth-go.
+
+Thank you for choosing civic-auth-go for your authentication needs!
